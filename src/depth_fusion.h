@@ -6,6 +6,6 @@
 using namespace std;
 using namespace cv;
 
-void confidence_fusion(const vector<Mat> &depth_maps, const vector<Mat> &conf_maps, const vector<Mat> &K, const vector<Mat> &R, const vector<Mat> &t, const vector<Mat> &bounds, const int index, const int depth_count, const Size shape, const bool dtu, int scale, const string data_path);
+void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vector<Mat> &conf_maps, Mat &fused_conf, const vector<Mat> &K, const vector<Mat> &P, const vector<vector<int>> &views, const int index, const string data_path);
 
 #endif

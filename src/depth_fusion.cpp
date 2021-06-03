@@ -17,12 +17,42 @@
 /*
  * @brief Performs depth map fusion using the confidence-based notion of a depth estimate
  *
- * @param depth_maps - The container holding the depth maps to be fused
- * @param conf_maps - The container holding the confidence maps needed for the fusion process
+ * @param depth_maps	 	- The container holding the depth maps to be fused.
+ * @param fused_map			- The reference to the output fused depth map.
+ * @param conf_maps 		- The container holding the confidence maps needed for the fusion process.
+ * @param fused_conf		- The reference to the output fused confidence map.
+ * @param K					- The container holding the intrinsics for each camera view.
+ * @param P					- The container holding the extrinsics for each cmaera view.
+ * @param views				- The container holding the supporting views for the current view.
+ * 							  This is a 2D vector with 'total_views' rows and 'num_views' columns.
+ * 							  For example: if we are fusing view #5, 
+ * 							  then views[5] is a list of the best supporting views to fuse for view #5.
+ * @param index				- The current view we are fusing.
+ * @param data_path			- The path to the root folder for our data. Used to store the point clouds after fusion.
+ * @param conf_pre_filt		- The pre-fusion confidence filter.
+ * 							  Pixels with confidence less than this value will not be considered for fusion consensus.
+ * @param conf_post_filt	- The post-fusion confidence filter.
+ * 							  Pixels with confidence less than this value will become 'holes' in the output fusion map.
+ * @param epsilon			- The support window used to access whether a depth supports the initial depth estimate.
+ * 							  This value is in the same units as the depth maps.
+ * 							  For example: DTU depth ranges from ~450mm to ~950mm; therefore, this value would be in mm.
  *
  */
-void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vector<Mat> &conf_maps, Mat &fused_conf, const vector<Mat> &K, const vector<Mat> &P, const int index, const float scale, const string data_path){
-    int depth_map_count = depth_maps.size();
+void confidence_fusion(
+		const vector<Mat> &depth_maps,
+		Mat &fused_map,
+		const vector<Mat> &conf_maps,
+		Mat &fused_conf,
+		const vector<Mat> &K,
+		const vector<Mat> &P,
+		const vector<vector<int>> &views,
+		const int index,
+		const string data_path,
+		const float conf_pre_filt,
+		const float conf_post_filt,
+		const float epsilon)
+{
+    int num_views = views[index].size();
     Size size = depth_maps[0].size();
 
     cout << "\tRendering depth maps into reference view..." << endl;
@@ -36,13 +66,13 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
     const int rows = size.height;
     const int cols = size.width;
 
-    for (int d=0; d < depth_map_count; ++d) {
-        if (d==index) {
-            depth_refs.push_back(depth_maps[index]);
-            conf_refs.push_back(conf_maps[index]);
-            continue;
-        }
+    float conf_threshold = 0.8;
 
+    // push the current view
+    depth_refs.push_back(depth_maps[index]);
+    conf_refs.push_back(conf_maps[index]);
+
+    for (auto d : views[index]) {
         Mat depth_ref = Mat::zeros(size, CV_32F);
         Mat conf_ref = Mat::zeros(size, CV_32F);
 
@@ -54,12 +84,16 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
                 float depth = depth_maps[d].at<float>(r,c);
                 float conf = conf_maps[d].at<float>(r,c);
 
+                if(conf < conf_threshold) {
+                    continue;
+                }
+
                 // compute corresponding (u,v) locations
                 Mat x_1(4,1,CV_32F);
-                x_1.at<float>(0,0) = c;
-                x_1.at<float>(1,0) = r;
-                x_1.at<float>(2,0) = 1;
-                x_1.at<float>(3,0) = 1/depth;
+                x_1.at<float>(0,0) = depth * c;
+                x_1.at<float>(1,0) = depth * r;
+                x_1.at<float>(2,0) = depth;
+                x_1.at<float>(3,0) = 1;
 
                 // find 3D world coord of back projection
                 Mat cam_coords = K[d].inv() * x_1;
@@ -83,7 +117,6 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
                     continue;
                 }
 
-
                 Mat diff = Mat::zeros(3,1,CV_32F);
                 diff.at<float>(0,0) = X_world.at<float>(0,0) - C_ref.at<float>(0,0);
                 diff.at<float>(0,1) = X_world.at<float>(0,1) - C_ref.at<float>(0,1);
@@ -91,18 +124,6 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
                 diff=R_ref*diff;
 
                 float proj_depth = diff.at<float>(0,2);
-                //float proj_depth = X_world.at<float>(0,2) - C_ref.at<float>(0,2);
-                /*
-                if(index==0 && c==100 && r==100){
-                    cout << d << ": " << c_p << "," << r_p << endl;
-                    cout << diff << endl;
-                    cout << X_world << endl;
-                    cout << "dp: " << depth << endl;
-                    cout << "gt: " << depth_maps[index].at<float>(88,109) << endl;
-                    cout << "pd: " << proj_depth << endl;
-                    cout << "cf: " << conf << endl << endl;
-                }
-                */
 
                 if (depth_ref.at<float>(r_p,c_p) > 0) {
                     if(depth_ref.at<float>(r_p,c_p) > proj_depth) {
@@ -125,7 +146,7 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
     float f;
     float initial_f;
     float C;
-    float eps = 50;
+    float eps = 4;
     float C_thresh = 0.1;
 
     cout << "\tFusing depth maps..." << endl;
@@ -137,7 +158,7 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
             C = 0.0;
             int initial_d = 0;
 
-            for (int d=0; d < depth_map_count; ++d) {
+            for (int d=0; d<num_views; ++d) {
                 if (conf_refs[d].at<float>(r,c) > C) {
                     f = depth_refs[d].at<float>(r,c);
                     C = conf_refs[d].at<float>(r,c);
@@ -149,7 +170,7 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
             initial_f = f;
 
             // for each depth map:
-            for (int d=0; d < depth_map_count; ++d) {
+            for (int d=0; d<num_views; ++d) {
                 // skip checking for the most confident depth map
                 if (d == initial_d) {
                     continue;
@@ -158,12 +179,13 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
                 float curr_depth = depth_refs[d].at<float>(r,c);
                 float curr_conf = conf_refs[d].at<float>(r,c);
 
-                if (curr_conf < C_thresh) {
+                // If confidence is below the threshold, do not have this pixel contribute
+                if (curr_conf < conf_pre_filt) {
                     continue;
                 }
 
                 // if depth is close to initial depth:
-                if (abs(curr_depth - initial_f) < eps) {
+                if (abs(curr_depth - initial_f) < epsilon) {
                     if((C + curr_conf) != 0) {
                         f = ((f*C) + (curr_depth*curr_conf)) / (C + curr_conf);
                     }
@@ -179,7 +201,11 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
                 }
             }
 
-            if (C <= 0.0) {
+            // Bound confidence to interval (0-1) (5 views could all have max contributions 1.0/-1.0, making the max value of C = 5.0/-5.0 for the given pixel)
+            C += num_views;
+            C /= (2*num_views);
+
+            if (C <= conf_post_filt) {
                 f = -1.0;
                 C = -1.0;
             }
@@ -190,7 +216,7 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
 
     int w = 5;
     int w_offset = (w-1)/2;
-    int w_inliers = (w*w)/4;
+    int w_inliers = (w*w)/3;
 
     int w_s = 3;
     int w_s_offset = (w_s-1)/2;
@@ -219,143 +245,6 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
     }
 
     fused_map = smoothed_map;
-    //fused_map = filled_map;
-
-    //TEST
-/*
-    // image 28
-    if(index == 0) {
-        int x = 222;
-        int y = 46;
-        float depth = fused_map.at<float>(y,x);
-
-        // compute corresponding (x,y) locations
-        Mat x_1(4,1,CV_32F);
-        x_1.at<float>(0,0) = x*depth;
-        x_1.at<float>(1,0) = y*depth;
-        x_1.at<float>(2,0) = depth;
-        x_1.at<float>(3,0) = 1;
-
-        // find 3D world coord of back projection
-        Mat cam_coords = K_fr[index].inv() * x_1;
-        Mat X_world = P[index].inv() * cam_coords;
-        X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
-        X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
-        X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
-        X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
-
-        cout << "(" << X_world.at<float>(0,0) << "," << X_world.at<float>(0,1) << "," << X_world.at<float>(0,2) << ")" << endl;
-
-        Mat x_w(4,1,CV_32F);
-        x_w.at<float>(0,0) = 126.24;
-        x_w.at<float>(1,0) = -202.64;
-        x_w.at<float>(2,0) = 667.31;
-        x_w.at<float>(3,0) = 1;
-
-        // find pixel location in reference image
-        Mat x_2 = K_fr[index] * P[index] * x_w;
-
-        x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
-        x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
-        x_2.at<float>(2,0) = x_2.at<float>(2,0)/x_2.at<float>(2,0);
-
-        int c_p = (int) floor(x_2.at<float>(0,0));
-        int r_p = (int) floor(x_2.at<float>(1,0));
-
-        cout << "(" << c_p << "," << r_p << ")" << endl << endl;
-        
-    }
-
-    // image 29
-    if(index == 1) {
-        int x = 249;
-        int y = 50;
-        float depth = fused_map.at<float>(y,x);
-
-        // compute corresponding (x,y) locations
-        Mat x_1(4,1,CV_32F);
-        x_1.at<float>(0,0) = x*depth;
-        x_1.at<float>(1,0) = y*depth;
-        x_1.at<float>(2,0) = depth;
-        x_1.at<float>(3,0) = 1;
-
-        // find 3D world coord of back projection
-        Mat cam_coords = K_fr[index].inv() * x_1;
-        Mat X_world = P[index].inv() * cam_coords;
-        X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
-        X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
-        X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
-        X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
-
-        cout << "(" << X_world.at<float>(0,0) << "," << X_world.at<float>(0,1) << "," << X_world.at<float>(0,2) << ")" << endl;
-
-        Mat x_w(4,1,CV_32F);
-        x_w.at<float>(0,0) = 126.24;
-        x_w.at<float>(1,0) = -202.64;
-        x_w.at<float>(2,0) = 667.31;
-        x_w.at<float>(3,0) = 1;
-
-        // find pixel location in reference image
-        Mat x_2 = K_fr[index] * P[index] * x_w;
-
-        x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
-        x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
-        x_2.at<float>(2,0) = x_2.at<float>(2,0)/x_2.at<float>(2,0);
-
-        int c_p = (int) floor(x_2.at<float>(0,0));
-        int r_p = (int) floor(x_2.at<float>(1,0));
-
-        cout << "(" << c_p << "," << r_p << ")" << endl << endl;
-        
-    }
-
-    // image 30
-    if(index == 2) {
-        int x = 275;
-        int y = 54;
-        float depth = fused_map.at<float>(y,x);
-
-        cout << K[index].at<float>(0,2) <<endl; 
-        cout << K[index].at<float>(1,2) <<endl; 
-        // compute corresponding (x,y) locations
-        Mat x_1(4,1,CV_32F);
-        x_1.at<float>(0,0) = (depth*x) - K[index].at<float>(0,2);
-        x_1.at<float>(1,0) = (depth*y) - K[index].at<float>(1,2);
-        x_1.at<float>(2,0) = (depth);
-        x_1.at<float>(3,0) = 1;
-
-
-        // find 3D world coord of back projection
-        Mat cam_coords = K_fr[index].inv() * x_1;
-        Mat X_world = P[index].inv() * cam_coords;
-        X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
-        X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
-        X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
-        X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
-
-        cout << "(" << X_world.at<float>(0,0) << "," << X_world.at<float>(0,1) << "," << X_world.at<float>(0,2) << ")" << endl;
-
-        Mat x_w(4,1,CV_32F);
-        x_w.at<float>(0,0) = 126.24;
-        x_w.at<float>(1,0) = -202.64;
-        x_w.at<float>(2,0) = 667.31;
-        x_w.at<float>(3,0) = 1;
-
-        // find pixel location in reference image
-        Mat x_2 = K_fr[index] * P[index] * x_w;
-
-        x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
-        x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
-        x_2.at<float>(2,0) = x_2.at<float>(2,0)/x_2.at<float>(2,0);
-
-        int c_p = (int) floor(x_2.at<float>(0,0));
-        int r_p = (int) floor(x_2.at<float>(1,0));
-
-        cout << "(" << c_p << "," << r_p << ")" << endl << endl;
-        
-    }
-*/
-    //TEST
 
     // write ply file
     vector<int> gray = {200, 200, 200};
@@ -369,18 +258,23 @@ void confidence_fusion(const vector<Mat> &depth_maps, Mat &fused_map, const vect
     }
 }
 
-
 int main(int argc, char **argv) {
-    
-    if (argc != 3) {
-        fprintf(stderr, "Error: usage %s <path-to-depth-maps> <down-sample-scale>\n", argv[0]);
+    // check for proper command-line usage
+    if (argc != 6) {
+        fprintf(stderr, "Error: usage %s <path-to-depth-maps> <num-views> <conf-pre-filt> <conf-post-filt> <epsilon>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
+	// read in command-line args
     string data_path = argv[1];
-    float scale = atof(argv[2]);
+    int num_views = atoi(argv[2]);
+	float conf_pre_filt = atof(argv[3]);
+	float conf_post_filt = atof(argv[4]);
+	float epsilon = atof(argv[5]);
+
     size_t str_len = data_path.length();
 
+	// string formatting to add '/' to data_path if it is missing from the input
     if (data_path[str_len-1] != '/') {
         data_path += "/";
     }
@@ -390,21 +284,36 @@ int main(int argc, char **argv) {
     vector<Mat> K;
     vector<Mat> P;
     Bounds bounds;
+    vector<vector<int>> views;
     
-    // load maps, K's, P's, bounds
+    // load maps, views, K's, P's, bounds
     printf("Loading data...\n");
     load_depth_maps(&depth_maps, data_path);
     load_conf_maps(&conf_maps, data_path);
+    load_views(&views, num_views, data_path);
     load_camera_params(&K, &P, &bounds, data_path);
-
-    down_sample_k(&K, scale);
 
     int depth_map_count = depth_maps.size();
     Size size = depth_maps[0].size();
 
+	/*
+	 * Augment the intrinsics matrices.
+	 * This is needed for the depth map rendering process.
+	 * It is a relatively straight-forward transformation.
+	 * The process can be seen below:
+	 *
+	 *			| k11  k12  k13 |
+	 *	K = 	| k21  k22  k23 |
+	 *			| k31  k32  k33 |
+	 *
+	 *			| k11  k12  k13  0 |
+	 *	K_aug = | k21  k22  k23  0 |
+	 *			| k31  k32  k33  0 |
+	 *			| 0    0    0    1 |
+	 */
     cout << "Computing Augmented Intrinsics..." << endl;
     vector<Mat> K_aug;
-    // augment intrinsics
+
     for (int i=0; i<depth_map_count; ++i) {
         Mat K_i;
         K_i.push_back(K[i].t());
@@ -422,33 +331,48 @@ int main(int argc, char **argv) {
         K_aug.push_back(K_i);
     }
 
+	// create containers to be populated with fusion output
     Mat fused_map = Mat::zeros(size, CV_32F);
     Mat fused_conf = Mat::zeros(size, CV_32F);
 
-    //stability_fusion(depth_maps, confidence_maps);
-    for (int i=0; i<depth_map_count; ++i) {
-        printf("Running confidence-based fusion for depth map %d/%d...\n",(i+1),depth_map_count);
+	// starting and ending index used to select which views to produce fused maps for (default is all views).
+    int start_ind = 0;
+    int end_ind = depth_map_count;
 
-        confidence_fusion(depth_maps, fused_map, conf_maps, fused_conf, K_aug, P, i, scale, data_path);
+    for (int i=start_ind; i<end_ind; ++i) {
+        printf("Running confidence-based fusion for depth map %d/%d...\n",(i+1)-start_ind,end_ind-start_ind);
 
+        confidence_fusion(
+				depth_maps,
+				fused_map,
+				conf_maps,
+				fused_conf,
+				K_aug,
+				P,
+				views,
+				i,
+				data_path,
+				conf_pre_filt,
+				conf_post_filt,
+				epsilon);
+
+		// save the depth and confidence map outputs in .pfm format
         if(i<10){
-            write_map(fused_map, data_path + "fused_maps/0" + to_string(i) + "_depth_fused.csv");
-            write_map(fused_conf, data_path + "fused_confs/0" + to_string(i) + "_conf_fused.csv");
+            save_pfm(fused_map, data_path + "fused_maps/0" + to_string(i) + "_depth_fused.csv");
+            save_pfm(fused_conf, data_path + "fused_confs/0" + to_string(i) + "_conf_fused.csv");
         } else {
-            write_map(fused_map, data_path + "fused_maps/" + to_string(i) + "_depth_fused.csv");
-            write_map(fused_conf, data_path + "fused_confs/" + to_string(i) + "_conf_fused.csv");
+            save_pfm(fused_map, data_path + "fused_maps/" + to_string(i) + "_depth_fused.csv");
+            save_pfm(fused_conf, data_path + "fused_confs/" + to_string(i) + "_conf_fused.csv");
         }
 
-        // display visual for fused depths and confs
-        /*
+        // save the depth and confidence map outputs in .png output for visual display
         if(i<10){
-            display_map(fused_map, "disp_depth_fused_0" + to_string(i) + ".png");
-            display_map(fused_conf, "disp_conf_fused_0" + to_string(i) + ".png");
+            display_depth(fused_map, data_path + "/output/disp_depth_fused_0" + to_string(i) + ".png");
+            display_conf(fused_conf, data_path + "/output/disp_conf_fused_0" + to_string(i) + ".png");
         } else {
-            display_map(fused_map, "disp_depth_fused_" + to_string(i) + ".png");
-            display_map(fused_conf, "disp_conf_fused_" + to_string(i) + ".png");
+            display_depth(fused_map, data_path + "/output/disp_depth_fused_" + to_string(i) + ".png");
+            display_conf(fused_conf, data_path + "/output/disp_conf_fused_" + to_string(i) + ".png");
         }
-        */
     }
 
     return EXIT_SUCCESS;
