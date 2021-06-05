@@ -60,7 +60,7 @@ The ***output***, ***post_fusion_points***, and ***pre_fusion_points*** director
 **NOTE**: These directories need to be initially added to the scene directory manually. The code does not yet check for existance of these directories and does not create them automatically.
 
 ### Pair.txt
-The ```pair.txt``` file is used to list the 10 best supporting views for each reference view in the scene. The current implementation uses the first 5 views. This file will need to be created if the user does not wish to modify the ```util.cpp``` file. If modified, the user may choose their own method of providing this information to the fusion function. For more information on the ```pair.txt``` file, please refer to the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36).
+The ```pair.txt``` file is used to list the 10 best supporting views for each reference view in the scene. The current implementation uses the first 5 views. This file will need to be created if the user does not wish to modify the ```util.cpp``` file. If modified, the user may choose their own method of providing this information to the fusion function.
 
 ### Running Fusion
 * navigate to the ```src``` directory in the repository,
