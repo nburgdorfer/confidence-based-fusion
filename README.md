@@ -13,6 +13,9 @@ An independent implementation of the Confidence-Based fusion method as described
 * Clone the repository
 * Update or install the appropriate versions of the above tools and libraries
 
+### Download
+[Here](https://drive.google.com/file/d/1CHNVZkuW5QzrRWV2n4ghanweKv5tnTxB/view?usp=sharing) is an sample dataset. It is structured following the guidelines below and includes data from the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36). This is the dataset that I use in the example below.
+
 ### File Structure
 The fusion code was written to only produce fused depth maps for a single scene. The fusion of several scenes, as well as any other functionality (such as evaluation) is left as a scripting exercise for the reader.
 
@@ -86,7 +89,7 @@ If successful, we can now run the fusion algorithm.
 
 * An example of execution:
 ```
-> ./depth_fusion ~/Data/fusion/dtu/all_samples/scan9/ 5 0.1 0.8 4.0
+> ./depth_fusion ~/Data/fusion/dtu/scan9/ 5 0.1 0.8 4.0
 ```
 
 where ***~/Data/fusion/dtu/all_samples/scan9/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***4.0*** is the support region size.
