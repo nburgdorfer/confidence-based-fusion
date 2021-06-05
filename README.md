@@ -38,11 +38,6 @@ The expected file structure:
     │       ├── 00000001_depth.pfm
             .
             .
-    │   ├── images
-    │       ├── 00000000.jpg
-    │       ├── 00000001.jpg
-            .
-            .
     │   ├── output
     │   ├── post_fusion_points
     │   ├── pre_fusion_points
@@ -57,7 +52,8 @@ The expected file structure:
 
 This is the structure that is being used in the current implementation. If modifications are made to the ```util.cpp``` file, the user can use any structure that is compatible with their modifications.
 
-The *output*, *post_fusion_points*, and *pre_fusion_points* directories are used to store the output from the fusion algorithm.
+The ***output***, ***post_fusion_points***, and ***pre_fusion_points*** directories are used to store the output from the fusion algorithm.
+
 **NOTE**: These directories need to be initially added to the scene directory manually. The code does not yet check for existance of these directories and does not create them automatically.
 
 ### Pair.txt
