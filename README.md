@@ -90,4 +90,16 @@ If successful, we can now run the fusion algorithm.
 
 where ***~/Data/fusion/dtu/all_samples/scan9/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***4.0*** is the support region size.
 
+### Output
+For each view in the scene, this fusion algorithm produces the following:
+
+* A fused depth map (.pfm)
+* A fused confidence map (.pfm)
+* A visual of the fused depth map (.png)
+* A visual of the fused confidence map (.png)
+* A point cloud of the fused depth map (.ply)
+* A point cloud of the input depth map (.ply)
+
+This algorithm only produces point clouds for individual views. It is left as an exercise to the user to manipulate or merge point clouds for a given scene.
+
 
