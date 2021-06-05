@@ -68,6 +68,11 @@ The ```pair.txt``` file is used to list the 10 best supporting views for each re
 ```
 > cd fusion/src
 ```
+* before compiling the code, first check the ```depth_fusion.cpp``` file to see if the appropriate number of cores are being used for the OpenMP loop parallelization. The current implementation takes advantage of 24 CPU cores. Please adjust this number for your host system. This adjustment is isolated to a single line of code (at the time of writing, this is around line 80).
+  * For example, if the host system has 8 CPU cores:
+  ```
+  #pragma omp parallel num_threads(8)
+  ```
 * create and navigate to a ```build``` directory,
 ```
 > mkdir build && cd build
