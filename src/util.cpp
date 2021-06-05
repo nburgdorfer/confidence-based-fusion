@@ -12,7 +12,13 @@
 
 #include "util.h"
 
-
+/*
+ * @brief Loads in all the confidence maps for a scene
+ *
+ * @param conf_maps     - The container to store the loaded confidence maps
+ * @param data_path     - The relative path to the base directory for the data
+ *
+ */
 void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
     cout << "Loading confidence maps..." << endl;
     DIR *dir;
@@ -52,6 +58,13 @@ void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
 
 }
 
+/*
+ * @brief Loads all the depth maps for a scene
+ *
+ * @param depth_maps    - The container to store the loaded depth maps
+ * @param data_path     - The relative path to the base directory for the data
+ *
+ */
 void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
     cout << "Loading depth maps..." << endl;
     DIR *dir;
@@ -91,9 +104,9 @@ void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
 }
 
 /*
- * @brief Loads all files found under 'data_path' into the 'images' container
+ * @brief Loads all the images for a scene
  *
- * @param images - The container to be populated with the loaded image objects
+ * @param images    - The container to be populated with the loaded images
  * @param data_path - The relative path to the base directory for the data
  *
  */
@@ -203,11 +216,11 @@ void load_views(vector<vector<int>> *views, const int num_views, string data_pat
 
 
 /*
- * @brief Loads in the camera intrinsics and extrinsics
+ * @brief Loads in the camera intrinsics, extrinsics, and bounds
  *
- * @param intrinsics - The container to be populated with the intrinsic matrices for the images
- * @param rotations - The container to be populated with the rotation matrices for the images
- * @param translations - The container to be populated with the translation vectors for the images
+ * @param K         - The container to be populated with the intrinsic matrices for the images
+ * @param P         - The container to be populated with the extrinsic matrices for the images
+ * @param bounds    - The container to be populated with the bounds for the images
  * @param data_path - The relative path to the base directory for the data
  *
  */
@@ -337,83 +350,13 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 }
 
 /*
- * @brief Loads in the boundary information based on the DTU dataset
+ * @brief Runs median filtering over a patch of pixels
  *
- * @param bounds - The container to be populated with the bounds information for the images
- * @param data_path - The relative path to the base directory for the data
- *
+ * @param patch         - A reference to the path of pixels to be smoothed
+ * @param filter_width  - The width of the median filter
+ * @param num_inliers   - The number of pixels in the patch that must have values
+ *            
  */
-void load_bounds(vector<Mat> *bounds, string data_path) {
-    cout << "Loading bounds..." << endl;
-    DIR *dir;
-    struct dirent *ent;
-    char bounds_path[256];
-    vector<char*> bounds_files;
-
-    FILE *fp;
-    char *line=NULL;
-    size_t n = 128;
-    ssize_t bytes_read;
-    char *ptr = NULL;
-
-    // load bounds
-    strcpy(bounds_path,data_path.c_str());
-    strcat(bounds_path,"bounding/");
-
-    if((dir = opendir(bounds_path)) == NULL) {
-        fprintf(stderr,"Error: Cannot open directory %s.\n",bounds_path);
-        exit(EXIT_FAILURE);
-    }
-
-    while((ent = readdir(dir)) != NULL) {
-        if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-            char *bounds_filename = (char*) malloc(sizeof(char) * 256);
-
-            strcpy(bounds_filename,bounds_path);
-            strcat(bounds_filename,ent->d_name);
-
-            bounds_files.push_back(bounds_filename);
-        }
-    }
-
-    // sort files by name
-    sort(bounds_files.begin(), bounds_files.end(), comp);
-
-    int bounds_count = bounds_files.size();
-
-    for (int i=0; i<bounds_count; ++i) {
-        if ((fp = fopen(bounds_files[i],"r")) == NULL) {
-            fprintf(stderr,"Error: could not open file %s.\n", bounds_files[i]);
-            exit(EXIT_FAILURE);
-        }
-
-        // load bounds vectors
-        Mat bound(2,1,CV_32F);
-
-        // get min distance
-        if ((bytes_read = getline(&line, &n, fp)) == -1) {
-            fprintf(stderr, "Error: could not read line from %s.\n",bounds_files[i]);
-        }
-
-        ptr = strstr(line,"\n");
-        strncpy(ptr,"\0",1);
-        bound.at<float>(0,0) = atof(line);
-
-        // get max dist
-        if ((bytes_read = getline(&line, &n, fp)) == -1) {
-            fprintf(stderr, "Error: could not read line from %s.\n",bounds_files[i]);
-        }
-
-        ptr = strstr(line,"\n");
-        strncpy(ptr,"\0",1);
-        bound.at<float>(1,0) = atof(line);
-
-        bounds->push_back(bound);
-
-        fclose(fp);
-    }
-}
-
 float med_filt(const Mat &patch, int filter_width, int num_inliers) {
     vector<float> vals;
     int inliers = 0;
@@ -442,6 +385,14 @@ float med_filt(const Mat &patch, int filter_width, int num_inliers) {
 }
 
 
+/*
+ * @brief Runs mean filtering over a patch of pixels
+ *
+ * @param patch         - A reference to the path of pixels to be smoothed
+ * @param filter_width  - The width of the mean filter
+ * @param num_inliers   - The number of pixels in the patch that must have values
+ *            
+ */
 float mean_filt(const Mat &patch, int filter_width, int num_inliers) {
     float sum = 0.0;
     int inliers = 0;
@@ -465,6 +416,16 @@ float mean_filt(const Mat &patch, int filter_width, int num_inliers) {
     return sum;
 }
 
+/*
+ * @brief Stores the given depth map as a point cloud
+ *
+ * @param depth_map     - The depth map to be stored
+ * @param K             - The intrinsic camera parameters for the view corresponding to the given map
+ * @param P             - The extrinsic camera parameters for the view corresponding to the given map
+ * @param filename      - The filename where the map will be stored
+ * @param color         - The color of the points in the generated point cloud
+ *
+ */
 void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string filename, const vector<int> color) {
     Size size = depth_map.size();
 
@@ -535,65 +496,13 @@ void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string fi
 
 }
 
-// down-sample images
-void down_sample(vector<Mat> *images, vector<Mat> *intrinsics, const float scale) {
-    if (scale <= 0) {
-        return;
-    }
-    Size size = (*images)[0].size();
-    Size scaled_size;
-    scaled_size.height = size.height * scale;
-    scaled_size.width = size.width * scale;
-
-    vector<Mat>::iterator img(images->begin());
-    vector<Mat>::iterator k(intrinsics->begin());
-
-    for (; img != images->end(); ++img,++k) {
-        for (int i = 0; i < scale; ++i) {
-            Mat temp_img = Mat::zeros(size, CV_32F);
-
-            resize(*img,temp_img, scaled_size);
-            *img = temp_img;
-        }
-
-        k->at<float>(0,0) = k->at<float>(0,0)*scale;
-        k->at<float>(1,1) = k->at<float>(1,1)*scale;
-        k->at<float>(0,2) = k->at<float>(0,2)*scale;
-        k->at<float>(1,2) = k->at<float>(1,2)*scale;
-    }
-}
-
-// down-sample intrinsics
-void down_sample_k(vector<Mat> *intrinsics, const float scale) {
-    if (scale <= 0) {
-        return;
-    }
-
-    vector<Mat>::iterator k(intrinsics->begin());
-
-    for (; k != intrinsics->end(); ++k) {
-        k->at<float>(0,0) = k->at<float>(0,0)*scale;
-        k->at<float>(1,1) = k->at<float>(1,1)*scale;
-        k->at<float>(0,2) = k->at<float>(0,2)*scale;
-        k->at<float>(1,2) = k->at<float>(1,2)*scale;
-    }
-}
-
-// up-sample images (used for writing images)
-Mat up_sample(const Mat *image, const int scale) {
-    Size size = image->size();
-    Mat enlarged_img = *image;
-
-    for (int i = 0; i < scale; ++i) {
-        Mat temp_img = Mat::zeros(size, CV_32F);
-        pyrUp(enlarged_img,temp_img);
-        enlarged_img = temp_img;
-    }
-
-    return enlarged_img;
-}
-
-// Image display utility (scales to [0,255])
+/*
+ * @brief Image display utility (scales to [0,255])
+ *
+ * @param map           - The depth map to display
+ * @param filename      - The file name to save the map
+ *
+ */
 void display_depth(const Mat map, string filename) {
     Size size = map.size();
     // crop 20 pixels
@@ -608,7 +517,14 @@ void display_depth(const Mat map, string filename) {
     imwrite(filename, output);
 }
 
-// Image display utility (scales to [0,1])
+/*
+ * @brief Image display utility (scales to [0,1])
+ *
+ * @param map           - The confidence map to display
+ * @param filename      - The file name to save the map
+ *
+ */
+
 void display_conf(const Mat map, string filename) {
     Size size = map.size();
     // crop 20 pixels
@@ -623,64 +539,13 @@ void display_conf(const Mat map, string filename) {
     imwrite(filename, output);
 }
 
-// Image writing utility (stores map)
-void write_csv(const Mat map, const string filename) {
-    /*
-    cv::FileStorage fs(filename, cv::FileStorage::WRITE);
-    fs << "map" << map;
-    fs.release();
-    */
-    Size size = map.size();
-    int rows = size.height;
-    int cols = size.width;
-
-    string curr_line;
-
-    ofstream output;
-    output.open(filename);
-
-    for(int r=0; r<rows; ++r) {
-        output << map.at<float>(r,0);
-        for(int c=1; c<cols; ++c) {
-            output << "," << map.at<float>(r,c);
-        }
-        output << "\n";
-    }
-    output.close();
-}
-
-Mat read_csv(const string file_path) {
-    int rows = 0;
-    int cols = 0;
-
-    vector<vector<float>> data;
-    string curr_line;
-
-    ifstream input(file_path);
-
-    while(getline(input, curr_line)) {
-        vector<float> row;
-        stringstream line(curr_line);
-        string curr_val;
-
-        while(getline(line,curr_val,',')) {
-            row.push_back(stof(curr_val));
-        }
-        data.push_back(row);
-    }
-
-    rows = data.size();
-    cols = data[0].size();
-    Mat map = Mat::zeros(rows,cols,CV_32F);
-
-    for (int r=0; r<rows; ++r) {
-        for (int c=0; c<cols; ++c){
-            map.at<float>(r,c) = data[r][c];            
-        }
-    }
-    return map;
-}
-
+/*
+ * @brief Loads data from a PFM file
+ *
+ * @param filePath - The file path of the PFM to be loaded
+ * @return Returns the cv::Mat with the data from the file
+ *
+ */
 Mat load_pfm(const string filePath)
 {
 
@@ -765,6 +630,15 @@ Mat load_pfm(const string filePath)
 }
 
 
+/*
+ * @brief Writes a matrix to a PFM file
+ *
+ * @param image         - The cv::Mat of data to be stored in the PFM file
+ * @param filePath      - The file path to store the data
+ *
+ * @return Returns true if the data was stored successfully; false otherwise
+ *
+ */
 bool save_pfm(const cv::Mat image, const std::string filePath)
 {
     //Open the file as binary!

@@ -17,25 +17,25 @@
 /*
  * @brief Performs depth map fusion using the confidence-based notion of a depth estimate
  *
- * @param depth_maps	 	- The container holding the depth maps to be fused.
- * @param fused_map			- The reference to the output fused depth map.
- * @param conf_maps 		- The container holding the confidence maps needed for the fusion process.
- * @param fused_conf		- The reference to the output fused confidence map.
- * @param K					- The container holding the intrinsics for each camera view.
- * @param P					- The container holding the extrinsics for each cmaera view.
- * @param views				- The container holding the supporting views for the current view.
- * 							  This is a 2D vector with 'total_views' rows and 'num_views' columns.
- * 							  For example: if we are fusing view #5, 
- * 							  then views[5] is a list of the best supporting views to fuse for view #5.
- * @param index				- The current view we are fusing.
- * @param data_path			- The path to the root folder for our data. Used to store the point clouds after fusion.
- * @param conf_pre_filt		- The pre-fusion confidence filter.
- * 							  Pixels with confidence less than this value will not be considered for fusion consensus.
- * @param conf_post_filt	- The post-fusion confidence filter.
- * 							  Pixels with confidence less than this value will become 'holes' in the output fusion map.
- * @param epsilon			- The support window used to access whether a depth supports the initial depth estimate.
- * 							  This value is in the same units as the depth maps.
- * 							  For example: DTU depth ranges from ~450mm to ~950mm; therefore, this value would be in mm.
+ * @param depth_maps        - The container holding the depth maps to be fused.
+ * @param fused_map		    - The reference to the output fused depth map.
+ * @param conf_maps 	    - The container holding the confidence maps needed for the fusion process.
+ * @param fused_conf	    - The reference to the output fused confidence map.
+ * @param K			        - The container holding the intrinsics for each camera view.
+ * @param P			        - The container holding the extrinsics for each cmaera view.
+ * @param views			    - The container holding the supporting views for the current view.
+ * 				                This is a 2D vector with 'total_views' rows and 'num_views' columns.
+ * 				                For example: if we are fusing view #5, 
+ * 				                then views[5] is a list of the best supporting views to fuse for view #5.
+ * @param index			    - The current view we are fusing.
+ * @param data_path		    - The path to the root folder for our data. Used to store the point clouds after fusion.
+ * @param conf_pre_filt     - The pre-fusion confidence filter.
+ * 				                Pixels with confidence less than this value will not be considered for fusion consensus.
+ * @param conf_post_filt    - The post-fusion confidence filter.
+ * 				                Pixels with confidence less than this value will become 'holes' in the output fusion map.
+ * @param epsilon		    - The support window used to access whether a depth supports the initial depth estimate.
+ * 				                This value is in the same units as the depth maps.
+ * 				                For example: DTU depth ranges from ~450mm to ~950mm; therefore, this value would be in mm.
  *
  */
 void confidence_fusion(
@@ -66,12 +66,11 @@ void confidence_fusion(
     const int rows = size.height;
     const int cols = size.width;
 
-    float conf_threshold = 0.8;
-
     // push the current view
     depth_refs.push_back(depth_maps[index]);
     conf_refs.push_back(conf_maps[index]);
 
+    // for each supporting view of the current index (reference view)
     for (auto d : views[index]) {
         Mat depth_ref = Mat::zeros(size, CV_32F);
         Mat conf_ref = Mat::zeros(size, CV_32F);
@@ -84,18 +83,17 @@ void confidence_fusion(
                 float depth = depth_maps[d].at<float>(r,c);
                 float conf = conf_maps[d].at<float>(r,c);
 
-                if(conf < conf_threshold) {
+                if(conf < conf_pre_filt) {
                     continue;
                 }
 
-                // compute corresponding (u,v) locations
+                // compute 3D world coord of back projection
                 Mat x_1(4,1,CV_32F);
                 x_1.at<float>(0,0) = depth * c;
                 x_1.at<float>(1,0) = depth * r;
                 x_1.at<float>(2,0) = depth;
                 x_1.at<float>(3,0) = 1;
 
-                // find 3D world coord of back projection
                 Mat cam_coords = K[d].inv() * x_1;
                 Mat X_world = P[d].inv() * cam_coords;
                 X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
@@ -103,20 +101,23 @@ void confidence_fusion(
                 X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
                 X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
 
-                // find pixel location in reference image
+                // calculate pixel location in reference image
                 Mat x_2 = K[index] * P[index] * X_world;
 
                 x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
                 x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
                 x_2.at<float>(2,0) = x_2.at<float>(2,0)/x_2.at<float>(2,0);
 
+                // take the floor to get the row and column pixel locations
                 int c_p = (int) floor(x_2.at<float>(0,0));
                 int r_p = (int) floor(x_2.at<float>(1,0));
                 
+                // ignore if pixel projection falls outside the image
                 if (c_p < 0 || c_p >= size.width || r_p < 0 || r_p >= size.height) {
                     continue;
                 }
 
+                // calculate the projection depth from reference image plane
                 Mat diff = Mat::zeros(3,1,CV_32F);
                 diff.at<float>(0,0) = X_world.at<float>(0,0) - C_ref.at<float>(0,0);
                 diff.at<float>(0,1) = X_world.at<float>(0,1) - C_ref.at<float>(0,1);
@@ -125,6 +126,12 @@ void confidence_fusion(
 
                 float proj_depth = diff.at<float>(0,2);
 
+                /* 
+                 * Keep the closer (smaller) projection depth.
+                 * A previous projection could have already populated the current pixel.
+                 * If it is 0, no previous projection to this pixel was seen.
+                 * Otherwise, we need to overwrite only if the current estimate is closer (smaller value).
+                 */
                 if (depth_ref.at<float>(r_p,c_p) > 0) {
                     if(depth_ref.at<float>(r_p,c_p) > proj_depth) {
                         depth_ref.at<float>(r_p,c_p) = proj_depth;
@@ -146,78 +153,83 @@ void confidence_fusion(
     float f;
     float initial_f;
     float C;
-    float eps = 4;
-    float C_thresh = 0.1;
 
     cout << "\tFusing depth maps..." << endl;
+
     for (int r=0; r<rows; ++r) {
         for (int c=0; c<cols; ++c) {
-            // set initial depth estimate and confidence value
             f = 0.0;
             initial_f = 0.0;
             C = 0.0;
             int initial_d = 0;
 
+            // take most confident pixel as initial depth estimate
             for (int d=0; d<num_views; ++d) {
                 if (conf_refs[d].at<float>(r,c) > C) {
                     f = depth_refs[d].at<float>(r,c);
                     C = conf_refs[d].at<float>(r,c);
+                    initial_f = f;
                     initial_d = d;
                 }
             }
 
-            // store the initial depth value
-            initial_f = f;
-
-            // for each depth map:
             for (int d=0; d<num_views; ++d) {
                 // skip checking for the most confident depth map
                 if (d == initial_d) {
                     continue;
                 }
 
+                // grab current depth and confidence values
                 float curr_depth = depth_refs[d].at<float>(r,c);
                 float curr_conf = conf_refs[d].at<float>(r,c);
 
-                // If confidence is below the threshold, do not have this pixel contribute
-                if (curr_conf < conf_pre_filt) {
-                    continue;
-                }
+                // if confidence is below the threshold, do not have this pixel contribute
+                // TODO: run tests to see how this affects estimation
+                //if (curr_conf < 0.1) {
+                //    continue;
+                //}
 
-                // if depth is close to initial depth:
+                // if depth is within the support region of the initial depth
                 if (abs(curr_depth - initial_f) < epsilon) {
                     if((C + curr_conf) != 0) {
                         f = ((f*C) + (curr_depth*curr_conf)) / (C + curr_conf);
                     }
                     C += curr_conf;
                 } 
-                // if depth is too close (occlusion):
+                // if depth is closer than initial estimate (occlusion)
                 else if(curr_depth < initial_f) {
                     C -= curr_conf;
                 }
-                // if depth is too large (free space violation):
+                // if depth is farther than initial estimate (free-space violation)
                 else if(curr_depth > initial_f) {
                     C -= conf_refs[initial_d].at<float>(r,c);
                 }
             }
 
-            // Bound confidence to interval (0-1) (5 views could all have max contributions 1.0/-1.0, making the max value of C = 5.0/-5.0 for the given pixel)
+            // bound confidence to interval (0-1)
+            // 5 views could all have max contributions 1.0/-1.0, making the max value of C = 5.0/-5.0 for the given pixel
+            // TODO: could be a better way to squeeze the confidence value to avoid the effect of outliers... Sigmoid?
             C += num_views;
             C /= (2*num_views);
 
+            // drop any estimates that do not meet the minimum confidence value
             if (C <= conf_post_filt) {
                 f = -1.0;
                 C = -1.0;
             }
+
+            // set the values for the confidence and depth estimates at the current pixel
             fused_map.at<float>(r,c) = f;
             fused_conf.at<float>(r,c) = C;
         }
     }
 
+    // hole-filling parameters
     int w = 5;
     int w_offset = (w-1)/2;
     int w_inliers = (w*w)/3;
 
+    // smoothing parameters
     int w_s = 3;
     int w_s_offset = (w_s-1)/2;
     int w_s_inliers = (w_s*w_s)/4;
@@ -235,6 +247,7 @@ void confidence_fusion(
             }
         }
     }
+
     // Smooth out inliers
     for (int r=w_s_offset; r<rows-w_s_offset; ++r) {
         for (int c=w_s_offset; c<cols-w_s_offset; ++c) {
@@ -246,16 +259,17 @@ void confidence_fusion(
 
     fused_map = smoothed_map;
 
-    // write ply file
+    // point cloud colors
     vector<int> gray = {200, 200, 200};
     vector<int> green = {0, 255, 0};
-    if(index<10){
-        write_ply(fused_map, K[index], P[index], data_path+"points_mvs/0"+to_string(index)+"_points.ply", gray);
-        write_ply(depth_maps[index], K[index], P[index], data_path+"points_unfused/0"+to_string(index)+"_points.ply", green);
-    } else {
-        write_ply(fused_map, K[index], P[index], data_path+"points_mvs/"+to_string(index)+"_points.ply", gray);
-        write_ply(depth_maps[index], K[index], P[index], data_path+"points_unfused/"+to_string(index)+"_points.ply", green);
-    }
+
+    // pad the index string with 0's
+    std::string index_str = to_string(index);
+    pad(index_str, 2, '0');
+
+    // write ply files
+    write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", gray);
+    write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", green);
 }
 
 int main(int argc, char **argv) {
@@ -265,16 +279,16 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-	// read in command-line args
+    // read in command-line args
     string data_path = argv[1];
     int num_views = atoi(argv[2]);
-	float conf_pre_filt = atof(argv[3]);
-	float conf_post_filt = atof(argv[4]);
-	float epsilon = atof(argv[5]);
+    float conf_pre_filt = atof(argv[3]);
+    float conf_post_filt = atof(argv[4]);
+    float epsilon = atof(argv[5]);
 
     size_t str_len = data_path.length();
 
-	// string formatting to add '/' to data_path if it is missing from the input
+    // string formatting to add '/' to data_path if it is missing from the input
     if (data_path[str_len-1] != '/') {
         data_path += "/";
     }
@@ -296,21 +310,21 @@ int main(int argc, char **argv) {
     int depth_map_count = depth_maps.size();
     Size size = depth_maps[0].size();
 
-	/*
-	 * Augment the intrinsics matrices.
-	 * This is needed for the depth map rendering process.
-	 * It is a relatively straight-forward transformation.
-	 * The process can be seen below:
-	 *
-	 *			| k11  k12  k13 |
-	 *	K = 	| k21  k22  k23 |
-	 *			| k31  k32  k33 |
-	 *
-	 *			| k11  k12  k13  0 |
-	 *	K_aug = | k21  k22  k23  0 |
-	 *			| k31  k32  k33  0 |
-	 *			| 0    0    0    1 |
-	 */
+    /*
+     * Augment the intrinsics matrices.
+     * This is needed for the depth map rendering process.
+     * It is a relatively straight-forward transformation.
+     * The process can be seen below:
+     *
+     *		    | k11  k12  k13 |
+     *	K = 	| k21  k22  k23 |
+     *		    | k31  k32  k33 |
+     *
+     *		    | k11  k12  k13  0 |
+     *	K_aug = | k21  k22  k23  0 |
+     *		    | k31  k32  k33  0 |
+     *		    | 0    0    0    1 |
+     */
     cout << "Computing Augmented Intrinsics..." << endl;
     vector<Mat> K_aug;
 
@@ -331,11 +345,11 @@ int main(int argc, char **argv) {
         K_aug.push_back(K_i);
     }
 
-	// create containers to be populated with fusion output
+    // create containers to be populated with fusion output
     Mat fused_map = Mat::zeros(size, CV_32F);
     Mat fused_conf = Mat::zeros(size, CV_32F);
 
-	// starting and ending index used to select which views to produce fused maps for (default is all views).
+    // starting and ending index used to select which views to produce fused maps for (default is all views).
     int start_ind = 0;
     int end_ind = depth_map_count;
 
@@ -343,36 +357,30 @@ int main(int argc, char **argv) {
         printf("Running confidence-based fusion for depth map %d/%d...\n",(i+1)-start_ind,end_ind-start_ind);
 
         confidence_fusion(
-				depth_maps,
-				fused_map,
-				conf_maps,
-				fused_conf,
-				K_aug,
-				P,
-				views,
-				i,
-				data_path,
-				conf_pre_filt,
-				conf_post_filt,
-				epsilon);
+                depth_maps,
+		        fused_map,
+        		conf_maps,
+		        fused_conf,
+	            K_aug,
+	            P,
+	            views,
+	            i,
+	            data_path,
+	            conf_pre_filt,
+	            conf_post_filt,
+	            epsilon);
 
-		// save the depth and confidence map outputs in .pfm format
-        if(i<10){
-            save_pfm(fused_map, data_path + "fused_maps/0" + to_string(i) + "_depth_fused.csv");
-            save_pfm(fused_conf, data_path + "fused_confs/0" + to_string(i) + "_conf_fused.csv");
-        } else {
-            save_pfm(fused_map, data_path + "fused_maps/" + to_string(i) + "_depth_fused.csv");
-            save_pfm(fused_conf, data_path + "fused_confs/" + to_string(i) + "_conf_fused.csv");
-        }
+        // pad the index string for filenames
+        std::string index_str = to_string(i);
+        pad(index_str, 2, '0');
+
+	    // save the depth and confidence map outputs in .pfm format
+        save_pfm(fused_map, data_path + "output/" + index_str + "_depth_fused.pfm");
+        save_pfm(fused_conf, data_path + "output/" + index_str + "_conf_fused.pfm");
 
         // save the depth and confidence map outputs in .png output for visual display
-        if(i<10){
-            display_depth(fused_map, data_path + "/output/disp_depth_fused_0" + to_string(i) + ".png");
-            display_conf(fused_conf, data_path + "/output/disp_conf_fused_0" + to_string(i) + ".png");
-        } else {
-            display_depth(fused_map, data_path + "/output/disp_depth_fused_" + to_string(i) + ".png");
-            display_conf(fused_conf, data_path + "/output/disp_conf_fused_" + to_string(i) + ".png");
-        }
+        display_depth(fused_map, data_path + "output/" + index_str + "_disp_depth_fused.png");
+        display_conf(fused_conf, data_path + "output/" + index_str + "_disp_conf_fused.png");
     }
 
     return EXIT_SUCCESS;
