@@ -92,7 +92,7 @@ If successful, we can now run the fusion algorithm.
 > ./depth_fusion ~/Data/fusion/dtu/scan9/ 5 0.1 0.8 4.0
 ```
 
-where ***~/Data/fusion/dtu/all_samples/scan9/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***4.0*** is the support region size.
+where ***~/Data/fusion/dtu/scan9/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***4.0*** is the support region size.
 
 ### Output
 For each view in the scene, this fusion algorithm produces the following:
