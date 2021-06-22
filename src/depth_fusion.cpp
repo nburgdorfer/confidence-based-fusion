@@ -174,7 +174,7 @@ void confidence_fusion(
             }
 
             for (int d=0; d<num_views; ++d) {
-                // skip checking for the most confident depth map
+                // skip computation if this iteration is the initial depth map
                 if (d == initial_d) {
                     continue;
                 }
@@ -202,7 +202,41 @@ void confidence_fusion(
                 }
                 // if depth is farther than initial estimate (free-space violation)
                 else if(curr_depth > initial_f) {
-                    C -= conf_refs[initial_d].at<float>(r,c);
+                    // compute 3D world coord of back projection
+                    Mat x_1(4,1,CV_32F);
+                    x_1.at<float>(0,0) = initial_f * c;
+                    x_1.at<float>(1,0) = initial_f * r;
+                    x_1.at<float>(2,0) = initial_f;
+                    x_1.at<float>(3,0) = 1;
+
+                    Mat cam_coords = K[initial_d].inv() * x_1;
+                    Mat X_world = P[initial_d].inv() * cam_coords;
+                    X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
+                    X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
+                    X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
+                    X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
+
+                    // calculate pixel location in reference image
+                    Mat x_2 = K[d] * P[d] * X_world;
+
+                    x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
+                    x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
+                    x_2.at<float>(2,0) = x_2.at<float>(2,0)/x_2.at<float>(2,0);
+
+                    // take the floor to get the row and column pixel locations
+                    int c_p = (int) floor(x_2.at<float>(0,0));
+                    int r_p = (int) floor(x_2.at<float>(1,0));
+                    
+                    // ignore if pixel projection falls outside the image
+                    if (c_p < 0 || c_p >= size.width || r_p < 0 || r_p >= size.height) {
+                        /* 
+                         * TODO: investigate what should be done in this instance
+                         * for now... reduce confidence by 0, since the projected confidence is unknown
+                         */
+                        C -= 0;
+                    } else {
+                        C -= conf_refs[d].at<float>(r_p,c_p);
+                    }
                 }
             }
 
