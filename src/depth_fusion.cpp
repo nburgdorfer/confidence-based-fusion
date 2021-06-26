@@ -33,9 +33,9 @@
  * 				                Pixels with confidence less than this value will not be considered for fusion consensus.
  * @param conf_post_filt    - The post-fusion confidence filter.
  * 				                Pixels with confidence less than this value will become 'holes' in the output fusion map.
- * @param epsilon		    - The support window used to access whether a depth supports the initial depth estimate.
- * 				                This value is in the same units as the depth maps.
- * 				                For example: DTU depth ranges from ~450mm to ~950mm; therefore, this value would be in mm.
+ * @param support_ratio		    - The support ratio used to assess whether a depth supports the initial depth estimate.
+ * 				                This value is a decimal value indicating the ratio between the support region and the current depth estimate.
+ * 				                For example: DTU depth values range from about [450mm-950mm], so a value of 0.01 would produce support regions [4.5mm-9.5mm].
  *
  */
 void confidence_fusion(
@@ -50,7 +50,7 @@ void confidence_fusion(
 		const string data_path,
 		const float conf_pre_filt,
 		const float conf_post_filt,
-		const float epsilon)
+		const float support_ratio)
 {
     int num_views = views[index].size();
     Size size = depth_maps[0].size();
@@ -150,19 +150,15 @@ void confidence_fusion(
     }
 
     // Fuse depth maps
-    float f;
-    float initial_f;
-    float C;
+    float f = 0.0;
+    float initial_f = 0.0;
+    float C = 0.0;
+    int initial_d = 0;
 
     cout << "\tFusing depth maps..." << endl;
 
     for (int r=0; r<rows; ++r) {
         for (int c=0; c<cols; ++c) {
-            f = 0.0;
-            initial_f = 0.0;
-            C = 0.0;
-            int initial_d = 0;
-
             // take most confident pixel as initial depth estimate
             for (int d=0; d<num_views; ++d) {
                 if (conf_refs[d].at<float>(r,c) > C) {
@@ -172,6 +168,9 @@ void confidence_fusion(
                     initial_d = d;
                 }
             }
+
+            // Set support region as fraction of initial depth estimate
+            float epsilon = support_ratio * initial_f;
 
             for (int d=0; d<num_views; ++d) {
                 // skip computation if this iteration is the initial depth map
@@ -228,13 +227,7 @@ void confidence_fusion(
                     int r_p = (int) floor(x_2.at<float>(1,0));
                     
                     // ignore if pixel projection falls outside the image
-                    if (c_p < 0 || c_p >= size.width || r_p < 0 || r_p >= size.height) {
-                        /* 
-                         * TODO: investigate what should be done in this instance
-                         * for now... reduce confidence by 0, since the projected confidence is unknown
-                         */
-                        C -= 0;
-                    } else {
+                    if (c_p >= 0 && c_p < size.width && r_p >= 0 && r_p < size.height) {
                         C -= conf_refs[d].at<float>(r_p,c_p);
                     }
                 }
@@ -318,7 +311,7 @@ int main(int argc, char **argv) {
     int num_views = atoi(argv[2]);
     float conf_pre_filt = atof(argv[3]);
     float conf_post_filt = atof(argv[4]);
-    float epsilon = atof(argv[5]);
+    float support_ratio = atof(argv[5]);
 
     size_t str_len = data_path.length();
 
@@ -402,7 +395,7 @@ int main(int argc, char **argv) {
 	            data_path,
 	            conf_pre_filt,
 	            conf_post_filt,
-	            epsilon);
+	            support_ratio);
 
         // pad the index string for filenames
         std::string index_str = to_string(i);
