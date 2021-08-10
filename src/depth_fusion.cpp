@@ -150,15 +150,20 @@ void confidence_fusion(
     }
 
     // Fuse depth maps
-    float f = 0.0;
-    float initial_f = 0.0;
-    float C = 0.0;
-    int initial_d = 0;
+    float f;
+    float initial_f;
+    float C;
+    int initial_d;
 
     cout << "\tFusing depth maps..." << endl;
 
     for (int r=0; r<rows; ++r) {
         for (int c=0; c<cols; ++c) {
+            f = 0.0;
+            initial_f = 0.0;
+            C = 0.0;
+            initial_d = 0;
+
             // take most confident pixel as initial depth estimate
             for (int d=0; d<num_views; ++d) {
                 if (conf_refs[d].at<float>(r,c) > C) {
