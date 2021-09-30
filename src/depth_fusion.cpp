@@ -297,7 +297,7 @@ void confidence_fusion(
 
     // pad the index string with 0's
     std::string index_str = to_string(index);
-    pad(index_str, 2, '0');
+    pad(index_str, 4, '0');
 
     // write ply files
     write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", gray);
@@ -404,7 +404,7 @@ int main(int argc, char **argv) {
 
         // pad the index string for filenames
         std::string index_str = to_string(i);
-        pad(index_str, 2, '0');
+        pad(index_str, 4, '0');
 
 	    // save the depth and confidence map outputs in .pfm format
         save_pfm(fused_map, data_path + "output/" + index_str + "_depth_fused.pfm");

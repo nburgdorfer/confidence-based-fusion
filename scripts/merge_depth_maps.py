@@ -11,6 +11,8 @@ def merge_plys(data_path):
 
     print("Loading point clouds...")
     for pc in file_list:
+        if(pc[-3:] != "ply"):
+            continue
         mesh = PlyData.read(data_path+pc)
         mesh_list.append(mesh.elements[0].data)
 
