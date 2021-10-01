@@ -123,7 +123,7 @@ do
     python3 migrate_maps.py ${MVSNET_DIR}${mvs_scan_dir}depths_mvsnet/ ${DATA_DIR}${fusion_scan_dir}
 
     # run depth fusion
-    $FUSION_EX ${DATA_DIR}${fusion_scan_dir} 5 0.1 0.8 4.0
+    $FUSION_EX ${DATA_DIR}${fusion_scan_dir} 5 0.1 0.8 0.01
 
     # merge output point clouds
     python3 merge_depth_maps.py ${DATA_DIR}${fusion_scan_dir}post_fusion_points/
