@@ -44,7 +44,7 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 Mat load_pfm(const string filePath);
 
 // storage functions
-void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string filename, const vector<int> color);
+void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string filename, const Mat &image);
 void display_depth(const Mat map, string filename);
 void display_conf(const Mat map, string filename);
 bool save_pfm(const cv::Mat image, const std::string filePath);

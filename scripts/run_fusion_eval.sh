@@ -120,10 +120,15 @@ do
 
     ##### run operations #####
     # migrate maps to fusion path
-    python3 migrate_maps.py ${MVSNET_DIR}${mvs_scan_dir}depths_mvsnet/ ${DATA_DIR}${fusion_scan_dir}
+	python3 migrate_maps.py ${MVSNET_DIR}${mvs_scan_dir}depths_mvsnet/ ${DATA_DIR}${fusion_scan_dir}depth_maps/ ${DATA_DIR}${fusion_scan_dir}conf_maps/ ${DATA_DIR}${fusion_scan_dir}cams/ ${DATA_DIR}${fusion_scan_dir}images/
+
+	# remove previous point cloud content
+    if [ -d  ${DATA_DIR}${fusion_scan_dir}post_fusion_points/ ]; then
+        rm -rf ${DATA_DIR}${fusion_scan_dir}post_fusion_points/*;
+    fi
 
     # run depth fusion
-    $FUSION_EX ${DATA_DIR}${fusion_scan_dir} 5 0.1 0.8 0.01
+    $FUSION_EX ${DATA_DIR}${fusion_scan_dir} 5 0.1 0.95 0.01
 
     # merge output point clouds
     python3 merge_depth_maps.py ${DATA_DIR}${fusion_scan_dir}post_fusion_points/
@@ -138,6 +143,9 @@ do
     # move merged point cloud to evaluation path
     cp ${DATA_DIR}${fusion_scan_dir}pre_fusion_points/merged.ply ${EVAL_PC_DIR_MVSNET}${pc_file_name_mvsnet}
 done
+
+# uncomment if it is not needed to run fusion eval
+exit 0
 
 # delete previous results if 'Results' directory is not empty
 if [ "$(ls -A $EVAL_RESULTS_DIR)" ]; then

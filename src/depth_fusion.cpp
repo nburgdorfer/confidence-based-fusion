@@ -43,6 +43,7 @@ void confidence_fusion(
 		Mat &fused_map,
 		const vector<Mat> &conf_maps,
 		Mat &fused_conf,
+		const vector<Mat> &images,
 		const vector<Mat> &K,
 		const vector<Mat> &P,
 		const vector<vector<int>> &views,
@@ -66,12 +67,14 @@ void confidence_fusion(
     const int rows = size.height;
     const int cols = size.width;
 
-    // push the current view
-    depth_refs.push_back(depth_maps[index]);
-    conf_refs.push_back(conf_maps[index]);
-
     // for each supporting view of the current index (reference view)
     for (auto d : views[index]) {
+		if(d == index) {
+			// push the current view
+			depth_refs.push_back(depth_maps[index]);
+			conf_refs.push_back(conf_maps[index]);
+			continue;
+		}
         Mat depth_ref = Mat::zeros(size, CV_32F);
         Mat conf_ref = Mat::zeros(size, CV_32F);
 
@@ -165,7 +168,7 @@ void confidence_fusion(
             initial_d = 0;
 
             // take most confident pixel as initial depth estimate
-            for (int d=0; d<num_views; ++d) {
+			for (int d=0; d<num_views; ++d) {
                 if (conf_refs[d].at<float>(r,c) > C) {
                     f = depth_refs[d].at<float>(r,c);
                     C = conf_refs[d].at<float>(r,c);
@@ -174,14 +177,22 @@ void confidence_fusion(
                 }
             }
 
+			// get the appropriate absolute index from the views vector
+			int abs_initial_d = views[index][initial_d];
+
             // Set support region as fraction of initial depth estimate
             float epsilon = support_ratio * initial_f;
 
-            for (int d=0; d<num_views; ++d) {
+			for (int d=0; d<num_views; ++d) {
                 // skip computation if this iteration is the initial depth map
                 if (d == initial_d) {
                     continue;
                 }
+
+				// get the appropriate absolute index from the views vector
+				int abs_d = views[index][d];
+				//cout << initial_d << "," << abs_initial_d << endl;
+				//cout << d << "," << abs_d << endl;
 
                 // grab current depth and confidence values
                 float curr_depth = depth_refs[d].at<float>(r,c);
@@ -213,15 +224,15 @@ void confidence_fusion(
                     x_1.at<float>(2,0) = initial_f;
                     x_1.at<float>(3,0) = 1;
 
-                    Mat cam_coords = K[initial_d].inv() * x_1;
-                    Mat X_world = P[initial_d].inv() * cam_coords;
+                    Mat cam_coords = K[index].inv() * x_1;
+                    Mat X_world = P[index].inv() * cam_coords;
                     X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
                     X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
                     X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
                     X_world.at<float>(0,3) = X_world.at<float>(0,3) / X_world.at<float>(0,3);
 
                     // calculate pixel location in reference image
-                    Mat x_2 = K[d] * P[d] * X_world;
+                    Mat x_2 = K[abs_d] * P[abs_d] * X_world;
 
                     x_2.at<float>(0,0) = x_2.at<float>(0,0)/x_2.at<float>(2,0);
                     x_2.at<float>(1,0) = x_2.at<float>(1,0)/x_2.at<float>(2,0);
@@ -233,7 +244,7 @@ void confidence_fusion(
                     
                     // ignore if pixel projection falls outside the image
                     if (c_p >= 0 && c_p < size.width && r_p >= 0 && r_p < size.height) {
-                        C -= conf_refs[d].at<float>(r_p,c_p);
+                        C -= conf_maps[abs_d].at<float>(r_p,c_p);
                     }
                 }
             }
@@ -291,17 +302,13 @@ void confidence_fusion(
 
     fused_map = smoothed_map;
 
-    // point cloud colors
-    vector<int> gray = {200, 200, 200};
-    vector<int> green = {0, 255, 0};
+	// pad the index string for filenames
+	std::string index_str = to_string(index);
+	pad(index_str, 4, '0');
 
-    // pad the index string with 0's
-    std::string index_str = to_string(index);
-    pad(index_str, 4, '0');
-
-    // write ply files
-    write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", gray);
-    write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", green);
+	// write ply files
+	write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", images[index]);
+	write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", images[index]);
 }
 
 int main(int argc, char **argv) {
@@ -327,6 +334,7 @@ int main(int argc, char **argv) {
     
     vector<Mat> depth_maps;
     vector<Mat> conf_maps;
+    vector<Mat> images;
     vector<Mat> K;
     vector<Mat> P;
     Bounds bounds;
@@ -336,6 +344,7 @@ int main(int argc, char **argv) {
     printf("Loading data...\n");
     load_depth_maps(&depth_maps, data_path);
     load_conf_maps(&conf_maps, data_path);
+	load_images(&images, data_path);
     load_views(&views, num_views, data_path);
     load_camera_params(&K, &P, &bounds, data_path);
 
@@ -393,6 +402,7 @@ int main(int argc, char **argv) {
 		        fused_map,
         		conf_maps,
 		        fused_conf,
+				images,
 	            K_aug,
 	            P,
 	            views,

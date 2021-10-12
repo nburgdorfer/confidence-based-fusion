@@ -143,7 +143,7 @@ void load_images(vector<Mat> *images, string data_path) {
     int img_count = img_files.size();
 
     for (int i=0; i<img_count; ++i) {
-        Mat img = imread(img_files[i]);
+        Mat img = imread(img_files[i], IMREAD_COLOR);
         img.convertTo(img,CV_32F);
         images->push_back(img);
     }
@@ -187,12 +187,14 @@ void load_views(vector<vector<int>> *views, const int num_views, string data_pat
 
     // load views
     for(int v=0; v<total_views; ++v) {
+        vector<int> v_i;
+
         // throw away view number...
         bytes_read = getline(&line, &n, fp);
         ptr = strstr(line,"\n");
         strncpy(ptr,"\0",1);
+		v_i.push_back(atoi(line));
 
-        vector<int> v_i;
         if ((bytes_read = getline(&line, &n, fp)) == -1) {
             fprintf(stderr, "Error: could not read line from %s.\n",view_path);
         }
@@ -202,7 +204,7 @@ void load_views(vector<vector<int>> *views, const int num_views, string data_pat
         
         char *token = strtok(line," ");
         int ind=0;
-        for(int i=1; (token != NULL && ind<num_views); ++i) {
+        for(int i=1; (token != NULL && ind<num_views-1); ++i) {
             if(i%2==0) {
                 v_i.push_back(atoi(token));
                 ++ind;
@@ -423,10 +425,10 @@ float mean_filt(const Mat &patch, int filter_width, int num_inliers) {
  * @param K             - The intrinsic camera parameters for the view corresponding to the given map
  * @param P             - The extrinsic camera parameters for the view corresponding to the given map
  * @param filename      - The filename where the map will be stored
- * @param color         - The color of the points in the generated point cloud
+ * @param iamge         - The image of the view in order to color the points
  *
  */
-void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string filename, const vector<int> color) {
+void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string filename, const Mat &image) {
     Size size = depth_map.size();
 
     int crop_val = 0;
@@ -446,10 +448,10 @@ void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string fi
 
             // compute corresponding (x,y) locations
             Mat x_1(4,1,CV_32F);
-            x_1.at<float>(0,0) = depth * c;
-            x_1.at<float>(1,0) = depth * r;
-            x_1.at<float>(2,0) = depth;
-            x_1.at<float>(3,0) = 1;
+            x_1.at<float>(0,0) = c;
+            x_1.at<float>(1,0) = r;
+            x_1.at<float>(2,0) = 1;
+            x_1.at<float>(3,0) = 1/depth;
 
             // find 3D world coord of back projection
             Mat cam_coords = K.inv() * x_1;
@@ -465,9 +467,9 @@ void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string fi
             ply_point.at<float>(0,1) = X_world.at<float>(0,1);
             ply_point.at<float>(0,2) = X_world.at<float>(0,2);
 
-            ply_point.at<float>(0,3) = color[0];
-            ply_point.at<float>(0,4) = color[1];
-            ply_point.at<float>(0,5) = color[2];
+            ply_point.at<float>(0,3) = image.at<Vec3f>(r,c)[0];
+            ply_point.at<float>(0,4) = image.at<Vec3f>(r,c)[1];
+            ply_point.at<float>(0,5) = image.at<Vec3f>(r,c)[2];
 
             ply_points.push_back(ply_point);
         }
