@@ -14,7 +14,7 @@ An independent implementation of the Confidence-Based fusion method as described
 * Update or install the appropriate versions of the above tools and libraries
 
 ### Download
-[Here](https://drive.google.com/file/d/1CHNVZkuW5QzrRWV2n4ghanweKv5tnTxB/view?usp=sharing) is an sample dataset. It is structured following the guidelines below and includes data from the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36). This is the dataset that I use in the example below.
+[Here](https://drive.google.com/file/d/18HDeECJ84QH9BA-13W56ByyJepnCGpv5/view?usp=sharing) is an sample dataset. It is structured following the guidelines below and includes data from the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36). This is the dataset that I use in the example below.
 
 ### File Structure
 The fusion code was written to only produce fused depth maps for a single scene. The fusion of several scenes, as well as any other functionality (such as evaluation) is left as a scripting exercise for the reader.
