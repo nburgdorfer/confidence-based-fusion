@@ -191,8 +191,6 @@ void confidence_fusion(
 
 				// get the appropriate absolute index from the views vector
 				int abs_d = views[index][d];
-				//cout << initial_d << "," << abs_initial_d << endl;
-				//cout << d << "," << abs_d << endl;
 
                 // grab current depth and confidence values
                 float curr_depth = depth_refs[d].at<float>(r,c);
@@ -224,8 +222,8 @@ void confidence_fusion(
                     x_1.at<float>(2,0) = initial_f;
                     x_1.at<float>(3,0) = 1;
 
-                    Mat cam_coords = K[index].inv() * x_1;
-                    Mat X_world = P[index].inv() * cam_coords;
+                    Mat cam_coords = K[abs_initial_d].inv() * x_1;
+                    Mat X_world = P[abs_initial_d].inv() * cam_coords;
                     X_world.at<float>(0,0) = X_world.at<float>(0,0) / X_world.at<float>(0,3);
                     X_world.at<float>(0,1) = X_world.at<float>(0,1) / X_world.at<float>(0,3);
                     X_world.at<float>(0,2) = X_world.at<float>(0,2) / X_world.at<float>(0,3);
