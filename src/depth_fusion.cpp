@@ -305,8 +305,8 @@ void confidence_fusion(
 	pad(index_str, 4, '0');
 
 	// write ply files
-	write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", images[index]);
-	write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", images[index]);
+	write_ply(fused_map, K[index], P[index], data_path+"points_fusion/" + index_str + "_points.ply", images[index]);
+	//write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", images[index]);
 }
 
 int main(int argc, char **argv) {
@@ -410,6 +410,7 @@ int main(int argc, char **argv) {
 	            conf_post_filt,
 	            support_ratio);
 
+		/*
         // pad the index string for filenames
         std::string index_str = to_string(i);
         pad(index_str, 4, '0');
@@ -421,6 +422,7 @@ int main(int argc, char **argv) {
         // save the depth and confidence map outputs in .png output for visual display
         display_depth(fused_map, data_path + "output/" + index_str + "_disp_depth_fused.png");
         display_conf(fused_conf, data_path + "output/" + index_str + "_disp_conf_fused.png");
+		*/
     }
 
     return EXIT_SUCCESS;

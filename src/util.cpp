@@ -26,9 +26,9 @@ void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
     char conf_path[256];
     vector<char*> conf_files;
 
-    // load images
+    // load confidence maps
     strcpy(conf_path,data_path.c_str());
-    strcat(conf_path,"conf_maps/");
+    strcat(conf_path,"depths_mvsnet/");
 
     if((dir = opendir(conf_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",conf_path);
@@ -37,12 +37,14 @@ void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-            char *conf_filename = (char*) malloc(sizeof(char) * 256);
+			if (strcmp(ent->d_name + 8, "_prob.pfm") == 0) {
+				char *conf_filename = (char*) malloc(sizeof(char) * 256);
 
-            strcpy(conf_filename,conf_path);
-            strcat(conf_filename,ent->d_name);
+				strcpy(conf_filename,conf_path);
+				strcat(conf_filename,ent->d_name);
 
-            conf_files.push_back(conf_filename);
+				conf_files.push_back(conf_filename);
+			}
         }
     }
 
@@ -74,7 +76,7 @@ void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
 
     // load images
     strcpy(depth_path,data_path.c_str());
-    strcat(depth_path,"depth_maps/");
+    strcat(depth_path,"depths_mvsnet/");
 
     if((dir = opendir(depth_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",depth_path);
@@ -83,12 +85,14 @@ void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-            char *depth_filename = (char*) malloc(sizeof(char) * 256);
+			if (strcmp(ent->d_name + 8, "_init.pfm") == 0) {
+				char *depth_filename = (char*) malloc(sizeof(char) * 256);
 
-            strcpy(depth_filename,depth_path);
-            strcat(depth_filename,ent->d_name);
+				strcpy(depth_filename,depth_path);
+				strcat(depth_filename,ent->d_name);
 
-            depth_files.push_back(depth_filename);
+				depth_files.push_back(depth_filename);
+			}
         }
     }
 
@@ -119,7 +123,7 @@ void load_images(vector<Mat> *images, string data_path) {
 
     // load images
     strcpy(img_path,data_path.c_str());
-    strcat(img_path,"images/");
+    strcat(img_path,"depths_mvsnet/");
 
     if((dir = opendir(img_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",img_path);
@@ -128,12 +132,14 @@ void load_images(vector<Mat> *images, string data_path) {
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-            char *img_filename = (char*) malloc(sizeof(char) * 256);
+			if (strcmp(ent->d_name + 8, ".png") == 0) {
+				char *img_filename = (char*) malloc(sizeof(char) * 256);
 
-            strcpy(img_filename,img_path);
-            strcat(img_filename,ent->d_name);
+				strcpy(img_filename,img_path);
+				strcat(img_filename,ent->d_name);
 
-            img_files.push_back(img_filename);
+				img_files.push_back(img_filename);
+			}
         }
     }
 
@@ -241,7 +247,7 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 
     // load intrinsics
     strcpy(camera_path,data_path.c_str());
-    strcat(camera_path,"cams/");
+    strcat(camera_path,"depths_mvsnet/");
 
     if((dir = opendir(camera_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",camera_path);
@@ -250,12 +256,14 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-            char *camera_filename = (char*) malloc(sizeof(char) * 256);
+			if (strcmp(ent->d_name + 8, ".txt") == 0) {
+				char *camera_filename = (char*) malloc(sizeof(char) * 256);
 
-            strcpy(camera_filename,camera_path);
-            strcat(camera_filename,ent->d_name);
+				strcpy(camera_filename,camera_path);
+				strcat(camera_filename,ent->d_name);
 
-            camera_files.push_back(camera_filename);
+				camera_files.push_back(camera_filename);
+			}
         }
     }
 
