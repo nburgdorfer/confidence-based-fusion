@@ -84,7 +84,7 @@ echo -e "\n"
 
 SCANS=(1 4 9 10 11 12 13 15 23 24 29 32 33 34 48 49 62 75 77 110 114 118)
 
-for SCAN in $SCANS
+for SCAN in ${SCANS[@]}
 do
     # run netowrk for each scan
     echo "Running DMFNet on scan ${SCAN}"
@@ -121,7 +121,7 @@ if [ "$(ls -A $EVAL_RESULTS_DIR)" ]; then
     rm -r $EVAL_RESULTS_DIR*
 fi
 
-USED_SETS="[${SCANS}]"
+USED_SETS="[${SCANS[@]}]"
 
 # run matlab evaluation on merged fusion point cloud
 matlab -nodisplay -nosplash -nodesktop -r "clear all; close all; format compact; arg_method='fusion'; UsedSets=${USED_SETS}; run('${EVAL_CODE_DIR}BaseEvalMain_web.m'); clear all; close all; format compact; arg_method='fusion'; UsedSets=${USED_SETS}; run('${EVAL_CODE_DIR}ComputeStat_web.m'); exit;" | tail -n +10
