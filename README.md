@@ -1,5 +1,5 @@
 # Real-Time Visibility-Based Fusion of Depth Maps
-An independent implementation of the Confidence-Based fusion method as described by Paul Merrell et al. in the [paper](https://graphics.stanford.edu/%7Epmerrell/Merrell_DepthMapFusion07.pdf), 'Real-Time Visibility-Based Fusion of Depth Maps'.
+An independent implementation of the Confidence-Based fusion method as described by Paul Merrell et al. in their [paper](https://graphics.stanford.edu/%7Epmerrell/Merrell_DepthMapFusion07.pdf), 'Real-Time Visibility-Based Fusion of Depth Maps'.
 
 ## Version Information (for reference only)
 * **ubuntu**:   20.04
