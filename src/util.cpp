@@ -28,7 +28,6 @@ void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
 
     // load confidence maps
     strcpy(conf_path,data_path.c_str());
-    strcat(conf_path,"depths_mvsnet/");
 
     if((dir = opendir(conf_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",conf_path);
@@ -37,7 +36,7 @@ void load_conf_maps(vector<Mat> *conf_maps, string data_path) {
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-			if (strcmp(ent->d_name + 8, "_prob.pfm") == 0) {
+			if (strcmp(ent->d_name + 8, "_conf.pfm") == 0) {
 				char *conf_filename = (char*) malloc(sizeof(char) * 256);
 
 				strcpy(conf_filename,conf_path);
@@ -76,7 +75,6 @@ void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
 
     // load images
     strcpy(depth_path,data_path.c_str());
-    strcat(depth_path,"depths_mvsnet/");
 
     if((dir = opendir(depth_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",depth_path);
@@ -85,7 +83,7 @@ void load_depth_maps(vector<Mat> *depth_maps, string data_path) {
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-			if (strcmp(ent->d_name + 8, "_init.pfm") == 0) {
+			if (strcmp(ent->d_name + 8, "_depth.pfm") == 0) {
 				char *depth_filename = (char*) malloc(sizeof(char) * 256);
 
 				strcpy(depth_filename,depth_path);
@@ -123,7 +121,7 @@ void load_images(vector<Mat> *images, string data_path) {
 
     // load images
     strcpy(img_path,data_path.c_str());
-    strcat(img_path,"depths_mvsnet/");
+    strcat(img_path,"images/");
 
     if((dir = opendir(img_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",img_path);
@@ -247,7 +245,6 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 
     // load intrinsics
     strcpy(camera_path,data_path.c_str());
-    strcat(camera_path,"depths_mvsnet/");
 
     if((dir = opendir(camera_path)) == NULL) {
         fprintf(stderr,"Error: Cannot open directory %s.\n",camera_path);
@@ -256,7 +253,7 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
 
     while((ent = readdir(dir)) != NULL) {
         if ((ent->d_name[0] != '.') && (ent->d_type != DT_DIR)) {
-			if (strcmp(ent->d_name + 8, ".txt") == 0) {
+			if (strcmp(ent->d_name + 8, "_cam.txt") == 0) {
 				char *camera_filename = (char*) malloc(sizeof(char) * 256);
 
 				strcpy(camera_filename,camera_path);
@@ -314,7 +311,7 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
         strncpy(ptr,"\0",1);
 
         // load K matrix
-        Mat K_i(3,3,CV_32F);
+        Mat K_i(4,4,CV_32F);
         for (int j=0; j<3; ++j) {
             if ((bytes_read = getline(&line, &n, fp)) == -1) {
                 fprintf(stderr, "Error: could not read line from %s.\n",camera_files[i]);
@@ -333,6 +330,8 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
             }
         }
 
+		K_i.at<float>(2,2) = 1.0;
+		K_i.at<float>(3,3) = 1.0;
         K->push_back(K_i);
 
         // throw away empty line...
@@ -345,8 +344,8 @@ void load_camera_params(vector<Mat> *K, vector<Mat> *P, Bounds *bounds, string d
             fprintf(stderr, "Error: could not read line from %s.\n",camera_files[i]);
         }
 
-        ptr = strstr(line,"\n");
-        strncpy(ptr,"\0",1);
+        //ptr = strstr(line,"\n");
+        //strncpy(ptr,"\0",1);
         
         char *token = strtok(line," ");
         int ind = 0;
@@ -516,7 +515,7 @@ void write_ply(const Mat &depth_map, const Mat &K, const Mat &P, const string fi
 void display_depth(const Mat map, string filename) {
     Size size = map.size();
     // crop 20 pixels
-    Mat cropped = map(Rect(14,14,size.width-30,size.height-30));
+    Mat cropped = map(Rect(0,0,size.width-1,size.height-1));
 
     int min = 425;
     int max = 937;
@@ -538,7 +537,7 @@ void display_depth(const Mat map, string filename) {
 void display_conf(const Mat map, string filename) {
     Size size = map.size();
     // crop 20 pixels
-    Mat cropped = map(Rect(14,14,size.width-30,size.height-30));
+    Mat cropped = map(Rect(0,0,size.width-1,size.height-1));
 
     int min = 0;
     int max = 1;

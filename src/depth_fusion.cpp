@@ -56,7 +56,7 @@ void confidence_fusion(
     int num_views = views[index].size();
     Size size = depth_maps[0].size();
 
-    cout << "\tRendering depth maps into reference view..." << endl;
+    //cout << "\tRendering depth maps into reference view..." << endl;
     // calculate reference camera center
     Mat R_ref = P[index](Rect(0,0,3,3));
     Mat t_ref = P[index](Rect(3,0,1,3));
@@ -78,7 +78,7 @@ void confidence_fusion(
         Mat depth_ref = Mat::zeros(size, CV_32F);
         Mat conf_ref = Mat::zeros(size, CV_32F);
 
-#pragma omp parallel num_threads(24)
+#pragma omp parallel num_threads(12)
 {
         #pragma omp for collapse(2)
         for (int r=0; r<rows; ++r) {
@@ -158,7 +158,7 @@ void confidence_fusion(
     float C;
     int initial_d;
 
-    cout << "\tFusing depth maps..." << endl;
+    //cout << "\tFusing depth maps..." << endl;
 
     for (int r=0; r<rows; ++r) {
         for (int c=0; c<cols; ++c) {
@@ -255,7 +255,7 @@ void confidence_fusion(
 
             // drop any estimates that do not meet the minimum confidence value
             if (C <= conf_post_filt) {
-                f = -1.0;
+                //f = -1.0;
                 C = -1.0;
             }
 
@@ -265,63 +265,65 @@ void confidence_fusion(
         }
     }
 
-    // hole-filling parameters
-    int w = 5;
-    int w_offset = (w-1)/2;
-    int w_inliers = (w*w)/3;
+    //	// hole-filling parameters
+    //	int w = 3;
+    //	int w_offset = (w-1)/2;
+    //	int w_inliers = 1;//(w*w)/6;
 
-    // smoothing parameters
-    int w_s = 3;
-    int w_s_offset = (w_s-1)/2;
-    int w_s_inliers = (w_s*w_s)/4;
+    //	// smoothing parameters
+    //	int w_s = 3;
+    //	int w_s_offset = (w_s-1)/2;
+    //	int w_s_inliers = 1;//(w_s*w_s)/3;
 
-    Mat filled_map = Mat::zeros(size, CV_32F);
-    Mat smoothed_map = Mat::zeros(size, CV_32F);
+    //	Mat filled_map = Mat::zeros(size, CV_32F);
+    //	Mat smoothed_map = Mat::zeros(size, CV_32F);
 
-    // Fill in holes (-1 values) in depth map
-    for (int r=w_offset; r<rows-w_offset; ++r) {
-        for (int c=w_offset; c<cols-w_offset; ++c) {
-            if (fused_map.at<float>(r,c) < 0.0){
-                filled_map.at<float>(r,c) = med_filt(fused_map(Rect(c-w_offset,r-w_offset,w,w)), w, w_inliers);
-            } else {
-                filled_map.at<float>(r,c) = fused_map.at<float>(r,c);
-            }
-        }
-    }
+    //	// Fill in holes (-1 values) in depth map
+    //	for (int r=w_offset; r<rows-w_offset; ++r) {
+    //	    for (int c=w_offset; c<cols-w_offset; ++c) {
+    //	        if (fused_map.at<float>(r,c) < 0.0){
+    //	            filled_map.at<float>(r,c) = med_filt(fused_map(Rect(c-w_offset,r-w_offset,w,w)), w, w_inliers);
+    //	        } else {
+    //	            filled_map.at<float>(r,c) = fused_map.at<float>(r,c);
+    //	        }
+    //	    }
+    //	}
 
-    // Smooth out inliers
-    for (int r=w_s_offset; r<rows-w_s_offset; ++r) {
-        for (int c=w_s_offset; c<cols-w_s_offset; ++c) {
-            if (filled_map.at<float>(r,c) != -1){
-                smoothed_map.at<float>(r,c) = med_filt(filled_map(Rect(c-w_s_offset,r-w_s_offset,w_s,w_s)), w_s, w_s_inliers);
-            }
-        }
-    }
+    //	// Smooth out inliers
+    //	for (int r=w_s_offset; r<rows-w_s_offset; ++r) {
+    //	    for (int c=w_s_offset; c<cols-w_s_offset; ++c) {
+    //	        if (filled_map.at<float>(r,c) != -1){
+    //	            smoothed_map.at<float>(r,c) = med_filt(filled_map(Rect(c-w_s_offset,r-w_s_offset,w_s,w_s)), w_s, w_s_inliers);
+    //	        }
+    //	    }
+    //	}
 
-    fused_map = smoothed_map;
+    //	fused_map = smoothed_map;
 
 	// pad the index string for filenames
 	std::string index_str = to_string(index);
 	pad(index_str, 4, '0');
 
 	// write ply files
-	write_ply(fused_map, K[index], P[index], data_path+"points_fusion/" + index_str + "_points.ply", images[index]);
+	//write_ply(fused_map, K[index], P[index], data_path+"post_fusion_points/" + index_str + "_points.ply", images[index]);
 	//write_ply(depth_maps[index], K[index], P[index], data_path+"pre_fusion_points/" + index_str + "_points.ply", images[index]);
 }
 
 int main(int argc, char **argv) {
     // check for proper command-line usage
-    if (argc != 6) {
-        fprintf(stderr, "Error: usage %s <path-to-depth-maps> <num-views> <conf-pre-filt> <conf-post-filt> <epsilon>\n", argv[0]);
+    if (argc != 8) {
+        fprintf(stderr, "Error: usage %s <data-root-path> <output-path> <scene> <num-views> <conf-pre-filt> <conf-post-filt> <epsilon>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     // read in command-line args
     string data_path = argv[1];
-    int num_views = atoi(argv[2]);
-    float conf_pre_filt = atof(argv[3]);
-    float conf_post_filt = atof(argv[4]);
-    float support_ratio = atof(argv[5]);
+    string output_path = argv[2];
+	string scene = argv[3];
+    int num_views = atoi(argv[4]);
+    float conf_pre_filt = atof(argv[5]);
+    float conf_post_filt = atof(argv[6]);
+    float support_ratio = atof(argv[7]);
 
     size_t str_len = data_path.length();
 
@@ -329,6 +331,15 @@ int main(int argc, char **argv) {
     if (data_path[str_len-1] != '/') {
         data_path += "/";
     }
+    if (output_path[str_len-1] != '/') {
+        output_path += "/";
+    }
+	string depth_path = data_path + "Depths/" + scene + "/";
+	string conf_path = data_path + "Confs/" + scene + "/";
+	string cam_path = data_path + "Cameras/";
+
+	string out_depth_path = output_path + "depths/";
+	string out_conf_path = output_path + "confs/";
     
     vector<Mat> depth_maps;
     vector<Mat> conf_maps;
@@ -340,49 +351,14 @@ int main(int argc, char **argv) {
     
     // load maps, views, K's, P's, bounds
     printf("Loading data...\n");
-    load_depth_maps(&depth_maps, data_path);
-    load_conf_maps(&conf_maps, data_path);
-	load_images(&images, data_path);
-    load_views(&views, num_views, data_path);
-    load_camera_params(&K, &P, &bounds, data_path);
+    load_depth_maps(&depth_maps, depth_path);
+    load_conf_maps(&conf_maps, conf_path);
+	//load_images(&images, img_path);
+    load_views(&views, num_views, cam_path);
+    load_camera_params(&K, &P, &bounds, cam_path);
 
     int depth_map_count = depth_maps.size();
     Size size = depth_maps[0].size();
-
-    /*
-     * Augment the intrinsics matrices.
-     * This is needed for the depth map rendering process.
-     * It is a relatively straight-forward transformation.
-     * The process can be seen below:
-     *
-     *		    | k11  k12  k13 |
-     *	K = 	| k21  k22  k23 |
-     *		    | k31  k32  k33 |
-     *
-     *		    | k11  k12  k13  0 |
-     *	K_aug = | k21  k22  k23  0 |
-     *		    | k31  k32  k33  0 |
-     *		    | 0    0    0    1 |
-     */
-    cout << "Computing Augmented Intrinsics..." << endl;
-    vector<Mat> K_aug;
-
-    for (int i=0; i<depth_map_count; ++i) {
-        Mat K_i;
-        K_i.push_back(K[i].t());
-
-        Mat temp2;
-        temp2.push_back(Mat::zeros(1,3,CV_32F));
-        K_i.push_back(temp2);
-        K_i = K_i.t();
-
-        Mat temp3;
-        temp3.push_back(Mat::zeros(3,1,CV_32F));
-        temp3.push_back(Mat::ones(1,1,CV_32F));
-        K_i.push_back(temp3.t());
-
-        K_aug.push_back(K_i);
-    }
 
     // create containers to be populated with fusion output
     Mat fused_map = Mat::zeros(size, CV_32F);
@@ -393,7 +369,7 @@ int main(int argc, char **argv) {
     int end_ind = depth_map_count;
 
     for (int i=start_ind; i<end_ind; ++i) {
-        printf("Running confidence-based fusion for depth map %d/%d...\n",(i+1)-start_ind,end_ind-start_ind);
+        //printf("Running confidence-based fusion for depth map %d/%d...\n",(i+1)-start_ind,end_ind-start_ind);
 
         confidence_fusion(
                 depth_maps,
@@ -401,7 +377,7 @@ int main(int argc, char **argv) {
         		conf_maps,
 		        fused_conf,
 				images,
-	            K_aug,
+	            K,
 	            P,
 	            views,
 	            i,
@@ -410,19 +386,17 @@ int main(int argc, char **argv) {
 	            conf_post_filt,
 	            support_ratio);
 
-		/*
         // pad the index string for filenames
         std::string index_str = to_string(i);
-        pad(index_str, 4, '0');
+        pad(index_str, 8, '0');
 
 	    // save the depth and confidence map outputs in .pfm format
-        save_pfm(fused_map, data_path + "output/" + index_str + "_depth_fused.pfm");
-        save_pfm(fused_conf, data_path + "output/" + index_str + "_conf_fused.pfm");
+        save_pfm(fused_map, out_depth_path + index_str + "_depth.pfm");
+        save_pfm(fused_conf, out_conf_path + index_str + "_conf.pfm");
 
         // save the depth and confidence map outputs in .png output for visual display
-        display_depth(fused_map, data_path + "output/" + index_str + "_disp_depth_fused.png");
-        display_conf(fused_conf, data_path + "output/" + index_str + "_disp_conf_fused.png");
-		*/
+        display_depth(fused_map, out_depth_path + index_str + "_depth_disp.png");
+        display_conf(fused_conf, out_conf_path + index_str + "_conf_disp.png");
     }
 
     return EXIT_SUCCESS;
