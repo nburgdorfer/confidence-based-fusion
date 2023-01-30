@@ -14,7 +14,7 @@ An independent implementation of the Confidence-Based fusion method as described
 * Update or install the appropriate versions of the above tools and libraries
 
 ### Download
-[Here](https://drive.google.com/file/d/18HDeECJ84QH9BA-13W56ByyJepnCGpv5/view?usp=sharing) is an sample dataset. It is structured following the guidelines below and includes data from the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36). This is the dataset that I use in the example below.
+[Here](https://drive.google.com/file/d/18HDeECJ84QH9BA-13W56ByyJepnCGpv5/view?usp=sharing) is an sample dataset. It is structured following the guidelines below and includes data from the [DTU - MVS Data Set](http://roboimagedata.compute.dtu.dk/?page_id=36).
 
 ### File Structure
 The fusion code was written to only produce fused depth maps for a single scene. The fusion of several scenes, as well as any other functionality (such as evaluation) is left as a scripting exercise for the reader.
@@ -22,7 +22,6 @@ The fusion code was written to only produce fused depth maps for a single scene.
 The expected file structure:
 ```
   root
-    ├─ scene000
     ├─ scene001
     ├─ scene002
     ├─ scene003
@@ -52,8 +51,6 @@ The expected file structure:
     .
     .
 ```
-
-This is the structure that is being used in the current implementation. If modifications are made to the ```util.cpp``` file, the user can use any structure that is compatible with their modifications.
 
 The ***output***, ***post_fusion_points***, and ***pre_fusion_points*** directories are used to store the output from the fusion algorithm.
 
@@ -92,7 +89,7 @@ If successful, we can now run the fusion algorithm.
 > ./depth_fusion ~/Data/fusion/dtu/scan9/ 5 0.1 0.8 0.01
 ```
 
-where ***~/Data/fusion/dtu/scan9/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***0.01*** defines the support region size (For example: DTU depth values range from about [450mm-950mm], so a value of 0.01 would produce support regions [4.5mm-9.5mm]).
+where ***~/Data/fusion/dtu/scan009/*** is the path to the scene we are fusing, ***5*** is the number of supporting views (including the reference view), ***0.1*** is the pre-fusion confidence threshold, ***0.8*** is the post-fusion confidence threshold, and ***0.01*** defines the support region size (For example: DTU depth values range from about [450mm-950mm], so a value of 0.01 would produce support regions [4.5mm-9.5mm], respectively).
 
 ### Output
 For each view in the scene, this fusion algorithm produces the following:
