@@ -12,8 +12,8 @@ def main():
     #method="npcvp_dtu"
     method="gbinet"
 
-    data_path = "/media/nate/Drive1/Results/V-FUSE/dtu/Output_{}_sup/".format(method)
-    gt_depth_path = "/media/nate/Data/Fusion/dtu/{}/GT_Depths/".format(method)
+    data_path = "/media/Data2/nate/Results/V-FUSE/dtu/Output_{}_BF/".format(method)
+    gt_depth_path = "/media/Data/nate/Fusion/dtu/{}/GT_Depths/".format(method)
     scans=[1, 4, 9, 10, 11, 12, 13, 15, 23, 24, 29, 32, 33, 34, 48, 49, 62, 75, 77, 110, 114, 118]
     num_scans = len(scans)
 
