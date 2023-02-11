@@ -12,9 +12,11 @@ def main():
     #method="npcvp_dtu"
     method="gbinet"
 
-    data_path = "/media/nate/Drive1/Results/V-FUSE/dtu/Output_{}_sup/".format(method)
-    gt_depth_path = "/media/nate/Data/Fusion/dtu/{}/GT_Depths/".format(method)
-    scans=[1, 4, 9, 10, 11, 12, 13, 15, 23, 24, 29, 32, 33, 34, 48, 49, 62, 75, 77, 110, 114, 118]
+    #data_path = "/media/nate/Drive1/Results/V-FUSE/dtu/Output_{}_no_sup/".format(method)
+    #gt_depth_path = "/media/nate/Data/Fusion/dtu/{}/GT_Depths/".format(method)
+    #scans=[1, 4, 9, 10, 11, 12, 13, 15, 23, 24, 29, 32, 33, 34, 48, 49, 62, 75, 77, 110, 114, 118]
+    data_path = "/media/nate/Drive1/Results/V-FUSE/blended_mvs/Output_{}/".format(method)
+    scans=[106,107,108,109,110,111,112]
     num_scans = len(scans)
 
     avg_mae = 0.0
@@ -23,10 +25,12 @@ def main():
     for scan in scans:
         print("\nEvaluating scan {}".format(scan))
 
-        scan_dir = "scan{:03d}/".format(scan)
+        #scan_dir = "scan{:03d}/".format(scan)
+        scan_dir = "scene{:03d}/".format(scan)
+        gt_path = "/media/nate/Data/BlendedMVS/{}/gt_depth/".format(scan_dir)
         depth_path = os.path.join(data_path,scan_dir,"depths")
         conf_path = os.path.join(data_path,scan_dir,"confs")
-        gt_path = os.path.join(gt_depth_path,scan_dir)
+        #gt_path = os.path.join(gt_depth_path,scan_dir)
 
         depth_files = os.listdir(depth_path)
         depth_files.sort()
@@ -51,7 +55,7 @@ def main():
             depth = load_pfm(os.path.join(depth_path, d))
             conf = load_pfm(os.path.join(conf_path, c))
             gt_depth = load_pfm(os.path.join(gt_path, g))
-            gt_depth = mask_depth_image(gt_depth, 427, 935)
+            #gt_depth = mask_depth_image(gt_depth, 427, 935)
             mean_abs_error, pe, num_gt = error_stats(depth,gt_depth,view_num)
             auc = compute_auc(depth, conf, gt_depth, view_num)
 
@@ -85,7 +89,7 @@ def main():
 
 def error_stats(fused_depth, gt_depth, view_num):
     height, width = gt_depth.shape
-    th = 0.125
+    th = 0.02
 
     fused_depth = fused_depth.astype(float)
     gt_depth = gt_depth.astype(float)
